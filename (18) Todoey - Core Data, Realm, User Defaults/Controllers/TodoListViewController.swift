@@ -13,6 +13,7 @@
 //  because User Defaults isn't meant to be a database (it's a plist file)
 //  when your app loads up, you have to load the entire User Defaults plist synchronously before you can use it
 //  if the User Defaults plist file is huge, then it can take a long time to load the app
+//  User Defaults can't handle custom classes/data models created
 
 // SINGLETON NOTES
 //  always retrieving the same instance of an object.
@@ -25,20 +26,24 @@ class TodoListViewController: UITableViewController {
     var itemArray = [Item]()
     
     // adding User Defaults
-    let defaults = UserDefaults.standard
+    //let defaults = UserDefaults.standard
+    
+    // to find the location of where files are stored on each device
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        let newItem = Item()
-        newItem.title = "Watch Spiderman"
-        itemArray.append(newItem)
+        
+        print(dataFilePath)
         
         // set itemArray to the User Defaults' itemArray if it exists
+//        if let items = defaults.array(forKey: "TodoListArray") as? [Item] {
+//            itemArray = items
+//        }
         
-        if let items = defaults.array(forKey: "TodoListArray") as? [Item] {
-            itemArray = items
-        }
+        loadItems()
+    
     }
     
     //MARK - TableView DataSource Methods
@@ -82,9 +87,7 @@ class TodoListViewController: UITableViewController {
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-        // to refresh so that the updated checkmarks reflect
-        // calls cellForRowAt func again
-        tableView.reloadData()
+        saveItems()
 
         tableView.deselectRow(at: indexPath, animated: true) // creates the flash highlight when the row is selected
 
@@ -107,7 +110,9 @@ class TodoListViewController: UITableViewController {
             self.itemArray.append(newItem)
             
             // saving the itemArray to our User Defaults
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
+            //self.defaults.set(self.itemArray, forKey: "TodoListArray")
+            
+            self.saveItems()
             
             // refresh the tableView to reflect the newly added row
             self.tableView.reloadData()
@@ -121,8 +126,35 @@ class TodoListViewController: UITableViewController {
         alert.addAction(action)
         
         present(alert, animated: true, completion: nil)
+    }
+    
+    //MARK - Model Manipulation Methods
+    func saveItems() {
+        // encoding allows you to save custom classes (containing standard data types) inside of a plist/json
+        let encoder = PropertyListEncoder()
         
+        do {
+            let data = try encoder.encode(itemArray)
+            try data.write(to: dataFilePath!)
+        } catch {
+            print("Error encoding item array, \(error)")
+        }
         
+        // to refresh so that the updated checkmarks reflect
+        // calls cellForRowAt func again
+        tableView.reloadData()
+    }
+    
+    func loadItems(){
+        if let data = try? Data(contentsOf: dataFilePath!){
+            let decoder = PropertyListDecoder()
+            
+            do {
+                itemArray = try decoder.decode([Item].self, from: data)
+            } catch {
+                print("Error decoding item array: \(error)")
+            }
+        }
     }
     
 
